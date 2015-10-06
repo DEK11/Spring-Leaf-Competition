@@ -57,3 +57,5 @@ df = pd.DataFrame()
 df["ID"] = testid
 df["target"] = output
 df.to_csv('output.csv', index = False)
+
+#Bare Random tree
