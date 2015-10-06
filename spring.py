@@ -4,12 +4,12 @@ import numpy as np
 train = pd.read_csv('train.csv', header=0)
 test = pd.read_csv('test.csv', header=0)
 
-train.shape
-test.shape
+#train.shape
+#test.shape
 
-train = train.drop(['ID'], axis=1)
+train = train.drop(['ID', 'VAR_0200'], axis=1)
 testid = test.ID
-test = test.drop(['ID'], axis=1)
+test = test.drop(['ID', 'VAR_0200'], axis=1)
 target = train.target
 train = train.drop(['target'], axis=1)
 
@@ -35,6 +35,16 @@ for col in trainColumns:
 train = train.drop(delcol, axis = 1)
 test = test.drop(delcol, axis = 1)
 
+
+delcol = []
+trainColumns = train.select_dtypes(['object']).columns
+for col in trainColumns:
+    if len(train[col].unique()) < 3 and train[col].isnull().sum() > 0:
+        delcol.append(col)
+train = train.drop(delcol, axis = 1)
+test = test.drop(delcol, axis = 1)
+
+
 #check what is contained
 #trainColumns = train.select_dtypes(['object']).columns
 #for col in trainColumns:
@@ -49,24 +59,28 @@ for col in trainColumns:
     test[col] = pd.to_datetime(test[col], format='%d%b%y:%H:%M:%S')
 
 for col in trainColumns:
-    train[col] = (train[col] - train[col].min()).astype('timedelta64[D]')
-    test[col] = (test[col] - test[col].min()).astype('timedelta64[D]')
+    mindate = train[col].min()
+    train[col] = (train[col] - mindate).astype('timedelta64[D]')
+    test[col] = (test[col] - mindate).astype('timedelta64[D]')
 
 
 #booleans columns
-trainColumns = ['VAR_0008', 'VAR_0009', 'VAR_0010', 'VAR_0011', 'VAR_0012', 'VAR_0043', 'VAR_0196', 'VAR_0226', 'VAR_0229', 'VAR_0230', 'VAR_0232', 'VAR_0236', 'VAR_0239']
+trainColumns = ['VAR_0226', 'VAR_0230', 'VAR_0232', 'VAR_0236']
 train[trainColumns] = train[trainColumns].fillna(train[trainColumns].median()).astype(int)
 test[trainColumns] = test[trainColumns].fillna(train[trainColumns].median()).astype(int)
 
 
 trainColumns = train.blocks['object'].columns
-train[trainColumns] = train[trainColumns].fillna('-1')
-test[trainColumns] = test[trainColumns].fillna('-1')
+for col in trainColumns:
+    trainmode = train[col].mode().astype(str).iloc[0]
+    train[col] = train[col].fillna(trainmode)
+    test[col] = test[col].fillna(trainmode)
 
 
+#dropped at start now
 #failed in label encoder
-train = train.drop(['VAR_0200'], axis=1)
-test = test.drop(['VAR_0200'], axis=1)
+#train = train.drop(['VAR_0200'], axis=1)
+#test = test.drop(['VAR_0200'], axis=1)
 
 test['VAR_0237'] = test['VAR_0237'].replace('ND', train['VAR_0237'].mode().astype(str).iloc[0])
 test['VAR_0283'] = test['VAR_0283'].replace('G', train['VAR_0283'].mode().astype(str).iloc[0])
@@ -95,9 +109,10 @@ for col in train.columns:
 
 
 from sklearn.ensemble import RandomForestClassifier
-forest = RandomForestClassifier(n_estimators = 500, random_state = 12345)
+forest = RandomForestClassifier(n_estimators = 500, random_state = 2543)
 forest = forest.fit(train, target)
-output = forest.predict(test)
+probs = forest.predict_proba(test)
+output = ["%f" % x[1] for x in probs]
 
 
 df = pd.DataFrame()
@@ -105,22 +120,3 @@ df["ID"] = testid
 df["target"] = output
 df.to_csv('output1.csv', index = False)
 
-
-
-
-
-#strings
-#['VAR_0001', 'VAR_0005', 'VAR_0044', 'VAR_0200', 'VAR_0202', 'VAR_0216', 'VAR_0222', 'VAR_0237', 'VAR_0274', 'VAR_0283', 'VAR_0305', 'VAR_0325', 'VAR_0342', 'VAR_0352', 'VAR_0353', 'VAR_0354', 'VAR_1934']
-
-#dates
-#['VAR_0073', 'VAR_0075', 'VAR_0156', 'VAR_0157', 'VAR_0158', 'VAR_0159', 'VAR_0166', 'VAR_0167', 'VAR_0168', 'VAR_0169', 'VAR_0176', 'VAR_0177', 'VAR_0178', 'VAR_0179', 'VAR_0204', 'VAR_0217']
-
-
-#delcol = ['VAR_0008', 'VAR_0009', 'VAR_0010', 'VAR_0011', 'VAR_0012', 'VAR_0043', 'VAR_0044', 'VAR_0196', 'VAR_0216', 'VAR_0222', 'VAR_0229', 'VAR_0239']
-#for col in delcol:
-#    train = train.drop([col], axis = 1)
-#    test = test.drop([col], axis = 1)
-
-#train = train.dropna(axis=0,how='any',subset=['VAR_0075'])
-#train = train.dropna(axis=0,how='any',subset=['VAR_0274'])
-#train = train.dropna(axis=0,how='any',subset=['VAR_0111'])
